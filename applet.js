@@ -58,7 +58,6 @@ IpIndicatorApplet.prototype = {
 		this._infoBox.set_vertical(true);
 		this._infoBox.set_margin_left(22);
 		this._infoBox.set_margin_right(22);
-		this._infoBox.set_margin_bottom(10);
 
 		this._ip = new St.Label();
 		this._infoBox.add(this._ip);
@@ -68,6 +67,7 @@ IpIndicatorApplet.prototype = {
 
 		this.menu.addActor(this._infoBox);
 
+		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		this.menu.addAction(_("Refresh"), (function() {
 			this._fetchInfo();
 		}).bind(this));
@@ -87,8 +87,6 @@ IpIndicatorApplet.prototype = {
 			}
 			var ipInfoJSON = request.response_body.data;
 			var ipInfo = JSON.parse(ipInfoJSON);
-
-			global.log(ipInfoJSON);
 			self._updateInfo(ipInfo.ip, ipInfo.country, ipInfo.country_code
 					.toLowerCase());
 		});
