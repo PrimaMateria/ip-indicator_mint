@@ -19,12 +19,15 @@ const
 Lang = imports.lang;
 const
 Mainloop = imports.mainloop;
+const
+Settings = imports.ui.settings;
 
 Soup.Session.prototype.add_feature.call(_httpSession,
 		new Soup.ProxyResolverDefault());
 
-var defaultTooltip = _("can't fetch IP information");
+var defaultTooltip = _("trying to fetch IP information");
 var noConnectionIcon = "nm-no-connection";
+var homeIcon = "gtk-home";
 
 function IpIndicatorApplet(orientation, panel_height, instance_id) {
 	this._init(orientation, panel_height, instance_id);
@@ -40,14 +43,27 @@ IpIndicatorApplet.prototype = {
 			this.icon_theme = Gtk.IconTheme.get_default();
 			this.icon_theme.append_search_path(metadata.path + "/flags");
 
+			this.settings = new Settings.AppletSettings(this, metadata.uuid,
+					instance_id);
+			this._buildSettings();
+
 			this.menuManager = new PopupMenu.PopupMenuManager(this);
 			this._buildMenu(orientation);
 			this._updateNoInfo();
+			this._fetchInfo();
 			this._fetchInfoPeriodic();
 
 		} catch (e) {
 			global.logError(e);
 		}
+	},
+
+	_buildSettings : function() {
+		this.settings.bindProperty(Settings.BindingDirection.IN, "home_isp",
+				"homeIsp", this._fetchInfo, null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"update_interval", "updateInterval", this._restartTimer, null);
 	},
 
 	_buildMenu : function(orientation) {
@@ -62,15 +78,18 @@ IpIndicatorApplet.prototype = {
 		this._ip = new St.Label();
 		this._infoBox.add(this._ip);
 
+		this._isp = new St.Label();
+		this._infoBox.add(this._isp);
+
 		this._country = new St.Label();
 		this._infoBox.add(this._country);
 
 		this.menu.addActor(this._infoBox);
 
-		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		this.menu.addAction(_("Refresh"), (function() {
-			this._fetchInfo();
-		}).bind(this));
+		// this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		// this.menu.addAction(_("Refresh"), (function() {
+		// this._fetchInfo();
+		// }).bind(this));
 
 	},
 
@@ -87,8 +106,8 @@ IpIndicatorApplet.prototype = {
 			}
 			var ipInfoJSON = request.response_body.data;
 			var ipInfo = JSON.parse(ipInfoJSON);
-			self._updateInfo(ipInfo.ip, ipInfo.country, ipInfo.country_code
-					.toLowerCase());
+			self._updateInfo(ipInfo.ip, ipInfo.isp, ipInfo.country,
+					ipInfo.country_code.toLowerCase());
 		});
 
 	},
@@ -100,25 +119,39 @@ IpIndicatorApplet.prototype = {
 		this.set_applet_icon_name(noConnectionIcon);
 	},
 
-	_updateInfo : function(ip, country, countryCode) {
+	_updateInfo : function(ip, isp, country, countryCode) {
 		this._infoBox.show();
 		this._ip.set_text(ip);
+		this._isp.set_text(isp);
 		this.set_applet_tooltip(ip);
 		this._country.set_text(country);
-		this.set_applet_icon_symbolic_name(countryCode);
-		this.set_applet_icon_name(countryCode);
+		if (isp == this.homeIsp) {
+			this.set_applet_icon_symbolic_name(homeIcon);
+			this.set_applet_icon_name(homeIcon);
+		} else {
+			this.set_applet_icon_symbolic_name(countryCode);
+			this.set_applet_icon_name(countryCode);
+		}
 	},
 
 	_fetchInfoPeriodic : function() {
 		this._fetchInfo();
-		this._periodicTimeoutId = Mainloop.timeout_add_seconds(5, Lang.bind(
-				this, this._fetchInfoPeriodic));
+		this._periodicTimeoutId = Mainloop.timeout_add_seconds(
+				this.updateInterval, Lang.bind(this, this._fetchInfoPeriodic));
+	},
+
+	_restartTimer : function() {
+		if (this._periodicTimeoutId) {
+			Mainloop.source_remove(this._periodicTimeoutId);
+		}
+		this._fetchInfoPeriodic();
 	},
 
 	on_applet_removed_from_panel : function() {
 		if (this._periodicTimeoutId) {
 			Mainloop.source_remove(this._periodicTimeoutId);
 		}
+		this.settings.finalize();
 	},
 
 	on_applet_clicked : function() {

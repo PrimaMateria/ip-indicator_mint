@@ -1,0 +1,18 @@
+{
+ "home_isp" : {
+    "type" : "entry",
+    "default": "Use your isp name from here: http://www.telize.com/geoip",
+    "description" : "Home isp:",
+    "tooltip" : "Fill out your home isp. If the isp from telize.com will match from this value, home icon will be used instead of country flag."
+ },
+ "update_interval" : {
+    "type": "spinbutton",
+    "default" : 5,
+    "min" : 0,
+    "max" : 3600000,
+    "step" : 5,
+    "units" : "miliseconds",
+    "description" : "Update interval:",
+    "tooltip" : "Update interval in which applet fire requests to telize.com service to get IP information."
+ }
+}
