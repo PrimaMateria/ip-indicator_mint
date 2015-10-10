@@ -29,8 +29,8 @@ var defaultTooltip = _("trying to fetch IP information");
 var noConnectionIcon = "nm-no-connection";
 var homeIcon = "gtk-home";
 
-function IpIndicatorApplet(orientation, panel_height, instance_id) {
-	this._init(orientation, panel_height, instance_id);
+function IpIndicatorApplet(metadata, orientation, panel_height, instance_id) {
+	this._init(metadata, orientation, panel_height, instance_id);
 }
 
 IpIndicatorApplet.prototype = {
@@ -99,7 +99,9 @@ IpIndicatorApplet.prototype = {
 			method : 'GET',
 			uri : new Soup.URI('http://www.telize.com/geoip')
 		});
+		global.log("fetching info");
 		_httpSession.queue_message(request, function(_httpSession, message) {
+			global.log("Got answer " + message);
 			if (message.status_code !== 200) {
 				self._updateNoInfo();
 				return;
