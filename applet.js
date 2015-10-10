@@ -43,6 +43,7 @@ IpIndicatorApplet.prototype = {
 			this.icon_theme = Gtk.IconTheme.get_default();
 			this.icon_theme.append_search_path(metadata.path + "/flags");
 
+			l
 			this.settings = new Settings.AppletSettings(this, metadata.uuid,
 					instance_id);
 			this._buildSettings();
@@ -99,9 +100,7 @@ IpIndicatorApplet.prototype = {
 			method : 'GET',
 			uri : new Soup.URI('http://www.telize.com/geoip')
 		});
-		global.log("fetching info");
 		_httpSession.queue_message(request, function(_httpSession, message) {
-			global.log("Got answer " + message);
 			if (message.status_code !== 200) {
 				self._updateNoInfo();
 				return;
