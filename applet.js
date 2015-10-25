@@ -21,6 +21,8 @@ const
 Mainloop = imports.mainloop;
 const
 Settings = imports.ui.settings;
+const
+Gio = imports.gi.Gio;
 
 Soup.Session.prototype.add_feature.call(_httpSession,
 		new Soup.ProxyResolverDefault());
@@ -60,10 +62,68 @@ IpIndicatorApplet.prototype = {
 
 	_buildSettings : function() {
 		this.settings.bindProperty(Settings.BindingDirection.IN, "home_isp",
-				"homeIsp", this._fetchInfo, null);
+				"homeIspName", this._updateSettings, null);
+		this.settings
+				.bindProperty(Settings.BindingDirection.IN,
+						"home_isp_icon-name", "homeIspIcon",
+						this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"home_isp_nickname", "homeIspNickname", this._updateSettings,
+				null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN, "other1_isp",
+				"other1IspName", this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other1_isp_icon-name", "other1IspIcon", this._updateSettings,
+				null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other1_isp_nickname", "other1IspNickname",
+				this._updateSettings, null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN, "other2_isp",
+				"other2IspName", this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other2_isp_icon-name", "other2IspIcon", this._updateSettings,
+				null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other2_isp_nickname", "other2IspNickname",
+				this._updateSettings, null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN, "other3_isp",
+				"other3IspName", this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other3_isp_icon-name", "other3IspIcon", this._updateSettings,
+				null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other3_isp_nickname", "other3IspNickname",
+				this._updateSettings, null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN, "other4_isp",
+				"other4IspName", this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other4_isp_icon-name", "other4IspIcon", this._updateSettings,
+				null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other4_isp_nickname", "other4IspNickname",
+				this._updateSettings, null);
+
+		this.settings.bindProperty(Settings.BindingDirection.IN, "other5_isp",
+				"other5IspName", this._updateSettings, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other5_isp_icon-name", "other5IspIcon", this._updateSettings,
+				null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+				"other5_isp_nickname", "other5IspNickname",
+				this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN,
 				"update_interval", "updateInterval", this._restartTimer, null);
+		this._prepareIspsSettings();
+	},
+
+	_updateSettings : function() {
+		this._prepareIspsSettings();
+		this._fetchInfo();
 	},
 
 	_buildMenu : function(orientation) {
@@ -91,6 +151,41 @@ IpIndicatorApplet.prototype = {
 		// this._fetchInfo();
 		// }).bind(this));
 
+	},
+
+	_prepareIspsSettings : function() {
+		this.homeIsp = {
+			name : this.homeIspName,
+			icon : this.homeIspIcon,
+			nickname : this.homeIspNickname
+		};
+		this.other1_isp = {
+			name : this.other1IspName,
+			icon : this.other1IspIcon,
+			nickname : this.other1IspNickname
+		};
+		this.other2_isp = {
+			name : this.other2IspName,
+			icon : this.other2IspIcon,
+			nickname : this.other2IspNickname
+		};
+		this.other3_isp = {
+			name : this.other3IspName,
+			icon : this.other3IspIcon,
+			nickname : this.other3IspNickname
+		};
+		this.other4_isp = {
+			name : this.other4IspName,
+			icon : this.other4IspIcon,
+			nickname : this.other4IspNickname
+		};
+		this.other5_isp = {
+			name : this.other5IspName,
+			icon : this.other5IspIcon,
+			nickname : this.other5IspNickname
+		};
+		this.ispsSettings = [ this.homeIsp, this.other1_isp, this.other2_isp,
+				this.other3_isp, this.other4_isp, this.other5_isp ];
 	},
 
 	_fetchInfo : function() {
@@ -122,16 +217,44 @@ IpIndicatorApplet.prototype = {
 	_updateInfo : function(ip, isp, country, countryCode) {
 		this._infoBox.show();
 		this._ip.set_text(ip);
-		this._isp.set_text(isp);
-		this.set_applet_tooltip(ip);
 		this._country.set_text(country);
-		if (isp == this.homeIsp) {
-			this.set_applet_icon_symbolic_name(homeIcon);
-			this.set_applet_icon_name(homeIcon);
-		} else {
-			this.set_applet_icon_symbolic_name(countryCode);
-			this.set_applet_icon_name(countryCode);
+
+		var tooltip = ip;
+		var ispName = isp;
+		var iconName;
+		var isIspSettingFound = false;
+
+		for (var i = 0; i < this.ispsSettings.length; i++) {
+			var ispSetting = this.ispsSettings[i];
+			if (isp == ispSetting.name) {
+				if (ispSetting.icon) {
+					iconName = ispSetting.icon;
+				} else {
+					iconName = countryCode;
+				}
+				if (ispSetting.nickname) {
+					tooltip = ispSetting.nickname;
+					ispName = ispSetting.nickname;
+				}
+				isIspSettingFound = true;
+				break;
+			}
 		}
+
+		if (!isIspSettingFound) {
+			iconName = countryCode;
+		}
+
+		var icon_file = Gio.File.new_for_path(iconName);
+		if (icon_file.query_exists(null)) {
+			this.set_applet_icon_path(iconName);
+		} else {
+			this.set_applet_icon_symbolic_name(iconName);
+			this.set_applet_icon_name(iconName);
+		}
+
+		this.set_applet_tooltip(tooltip);
+		this._isp.set_text(ispName);
 	},
 
 	_fetchInfoPeriodic : function() {
