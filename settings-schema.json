@@ -6,8 +6,30 @@
     "max" : 3600000,
     "step" : 1,
     "units" : "seconds",
-    "description" : "Update interval:",
-    "tooltip" : "Update interval in which applet fire requests to telize.com service to get IP information."
+    "description" : "Interface check interval:",
+    "tooltip" : "Interval in which applet will check if there was change in network interfaces. Can be frequent."
+ },
+ 
+ "update_interval_service": {
+    "type": "spinbutton",
+    "default" : 5,
+    "min" : 3,
+    "max" : 100,
+    "step" : 1,
+    "units" : "minutes",
+    "description" : "IP Service interval:",
+    "tooltip" : "Interval in which applet will fire get request to one of IP Services. Don't make it too frequent for not overloading servers."
+ },
+ 
+ "debugger": {
+    "type": "spinbutton",
+    "default" : 0,
+    "min" : 0,
+    "max" : 2,
+    "step" : 1,
+    "units" : "level",
+    "description" : "Debug mode:",
+    "tooltip" : "For debugging purposes. Higher level means more logs in ~/.cinnamon/glass.log"
  },
  
  "head1" : {
