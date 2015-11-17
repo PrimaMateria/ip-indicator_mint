@@ -1,5 +1,5 @@
 {
- "update_interval" : {
+ "update_interval_ifconfig" : {
     "type": "spinbutton",
     "default" : 5,
     "min" : 1,
@@ -21,14 +21,14 @@
     "tooltip" : "Interval in which applet will fire get request to one of IP Services. Don't make it too frequent for not overloading servers."
  },
  
- "debugger": {
+ "debug_level": {
     "type": "spinbutton",
     "default" : 0,
     "min" : 0,
     "max" : 2,
     "step" : 1,
-    "units" : "level",
-    "description" : "Debug mode:",
+    "units" : "",
+    "description" : "Debug level:",
     "tooltip" : "For debugging purposes. Higher level means more logs in ~/.cinnamon/glass.log"
  },
  

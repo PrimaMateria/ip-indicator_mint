@@ -19,17 +19,33 @@ var defaultTooltip = _("trying to fetch IP information");
 var noConnectionIcon = "nm-no-connection";
 var homeIcon = "gtk-home";
 
+Debugger = {
+    logLevel: 0,
+    setLogLevel: function(level) {
+        this.log("Setting new log level: "+level, 1);
+        this.logLevel = level;  
+    },
+    
+	log: function(message, level) {
+        if (!level) {
+            level = 1;
+        }
+        if (level <= this.logLevel) {    
+            global.log(message);
+        }
+	}
+}
+
 IpGateway = {
 	init: function() {
 		this._services = [];
-        this._ispServices = [];
-        this._serviceIteration = 0;
-        
-		//this._services.push({ url: "", parse: function(response) {}});
+		this._ispServices = [];
+		this._serviceIteration = 0;
+
 		this._services.push({
 			url: "https://api.ipify.org?format=json",
 			parse: function(jsonResponse) {
-                let response = JSON.parse(jsonResponse);
+				let response = JSON.parse(jsonResponse);
 				return response.ip;
 			}
 		});
@@ -42,75 +58,81 @@ IpGateway = {
 		this._services.push({
 			url: "http://geoip.nekudo.com/api/",
 			parse: function(jsonResponse) {
-                let response = JSON.parse(jsonResponse);
+				let response = JSON.parse(jsonResponse);
 				return response.ip;
 			}
 		});
 		this._services.push({
 			url: "http://ip-json.rhcloud.com/json",
 			parse: function(jsonResponse) {
-                let response = JSON.parse(jsonResponse);
+				let response = JSON.parse(jsonResponse);
 				return response.q;
 			}
 		});
 		this._services.push({
 			url: "http://ipinfo.io/json",
 			parse: function(jsonResponse) {
-                let response = JSON.parse(jsonResponse);
+				let response = JSON.parse(jsonResponse);
 				return response.ip;
 			}
 		});
 
-
+        // ISP Service should be only one, because different services return different ISPs
 		this._ispServices.push({
 			url: "http://ip-api.com/json",
 			parse: function(jsonResponse) {
-                let response = JSON.parse(jsonResponse);
+				let response = JSON.parse(jsonResponse);
 				return {
-					ip: response.ip,
-					isp: reponse.isp,
-                    country: response.country,
-					countryCode: reponse.countryCode
+					ip: response.query,
+					isp: response.isp,
+					country: response.country,
+					countryCode: response.countryCode
 				};
 			}
 		});
 	},
 
 	getOnlyIp: function(callback) {
-        if (this._serviceIteration + 1 >= this._services.length) {
-            this._serviceIteration = 0;
-        } else {
-            this._serviceIteration += 1;
-        }
-        let service = this._services[this._serviceIteration];
-        this._get(service.url, function(response) {
-            let ip = service.parse(response);
-            callback(ip);
-        });
+		Debugger.log("Fetching only IP");
+		if (this._serviceIteration + 1 >= this._services.length) {
+			this._serviceIteration = 0;
+		} else {
+			this._serviceIteration += 1;
+		}
+		let service = this._services[this._serviceIteration];
+		this._get(service.url, function(response) {
+            Debugger.log("Response = "+response, 2);
+			let ip = service.parse(response);
+			callback(ip);
+		});
 	},
-    
+
 	getFullInfo: function(callback) {
-        let service = this._ispServices[0];
-        this._get(service.url, function(response) {
-            let fullInfo = parse(response);
-            callback(fullInfo.ip, fullInfo.isp, fullInfo.country, fullInfo.countryCode);
-        });
+		Debugger.log("Fetching full info");
+		let service = this._ispServices[0];
+		this._get(service.url, function(response) {
+            Debugger.log("Response = "+response, 2);
+            
+			let fullInfo = service.parse(response);
+			callback(fullInfo.ip, fullInfo.isp, fullInfo.country, fullInfo.countryCode);
+		});
 	},
-    
-    _get: function(url, callback) {
-        global.log(url);
+
+	_get: function(url, callback) {
+		Debugger.log(url, 2);
 		var request = new Soup.Message({
 			method: 'GET',
 			uri: new Soup.URI(url)
 		});
 		_httpSession.queue_message(request, function(_httpSession, message) {
-			if (message.status_code !== 200) {				
+            Debugger.log("Status code: "+message.status_code, 2);
+			if (message.status_code !== 200) {
 				return;
 			}
-            let data = request.response_body.data;
+			let data = request.response_body.data;
 			callback(data);
 		});
-    }
+	}
 }
 
 function IpIndicatorApplet(metadata, orientation, panel_height, instance_id) {
@@ -127,18 +149,18 @@ IpIndicatorApplet.prototype = {
 			this.icon_theme = Gtk.IconTheme.get_default();
 			this.icon_theme.append_search_path(metadata.path + "/flags");
 			this._getNetworkInterfacesPath = metadata.path + "/getNetworkInterfaces.sh";
-            this._interfaces = [];
-            IpGateway.init();
+			this._interfaces = [];
+			IpGateway.init();
 
 			this.settings = new Settings.AppletSettings(this, metadata.uuid,
 				instance_id);
 			this._buildSettings();
+			this._updateLogLevel();
 
 			this.menuManager = new PopupMenu.PopupMenuManager(this);
 			this._buildMenu(orientation);
 			this._updateNoInfo();
-			this._fetchInfo();
-			this._fetchInfoPeriodic();
+			this._restartTimer();
 
 		} catch (e) {
 			global.logError(e);
@@ -202,14 +224,44 @@ IpIndicatorApplet.prototype = {
 			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-			"update_interval", "updateInterval", this._restartTimer, null);
+			"update_interval_ifconfig", "updateIntervalIfconfig", this._restartTimer, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+			"update_interval_service", "updateIntervalService", this._restartTimer, null);
+		this.settings.bindProperty(Settings.BindingDirection.IN,
+			"debug_level", "debuggerLogLevel", this._updateLogLevel, null);
 		this._prepareIspsSettings();
 	},
+    
+    _updateLogLevel: function() {
+        Debugger.log("Setting debugger log level: "+this.debuggerLogLevel);
+        Debugger.logLevel = this.debuggerLogLevel;
+    },
 
 	_updateSettings: function() {
+		Debugger.log("Updating settings");
 		this._prepareIspsSettings();
-		this._fetchInfo();
+		//clean up interfaces so new ISP settings will be applied
+		this._interfaces = [];
+		this._restartTimer();
 	},
+    
+    _updateViaIfconfigPeriodic: function() {
+        if (this._areNetworkInterfacesChanged()) {
+            this._fetchFullInfo();
+        }
+        Debugger.log("Update interval ifconfig = "+ this.updateIntervalIfconfig + " seconds", 2);
+        
+		this._periodicTimeoutIfconfigId = Mainloop.timeout_add_seconds(
+			this.updateIntervalIfconfig, Lang.bind(this, this._updateViaIfconfigPeriodic));
+	},
+    
+    _updateViaIpServicePeriodic: function() {
+        this._isPublicIpChanged(Lang.bind(this, this._fetchFullInfo));
+        Debugger.log("Update interval service = "+ this.updateIntervalService + " minutes", 2);
+        
+        this._periodicTimeoutIpServiceId = Mainloop.timeout_add_seconds(
+            this.updateIntervalService * 60, Lang.bind(this, this._updateViaIpServicePeriodic));
+    },
 
 	_buildMenu: function(orientation) {
 		this.menu = new Applet.AppletPopupMenu(this, orientation);
@@ -230,12 +282,6 @@ IpIndicatorApplet.prototype = {
 		this._infoBox.add(this._country);
 
 		this.menu.addActor(this._infoBox);
-
-		// this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		// this.menu.addAction(_("Refresh"), (function() {
-		// this._fetchInfo();
-		// }).bind(this));
-
 	},
 
 	_prepareIspsSettings: function() {
@@ -274,30 +320,13 @@ IpIndicatorApplet.prototype = {
 		];
 	},
 
-	_fetchInfo: function() {
-		var self = this;
-		var request = new Soup.Message({
-			method: 'GET',
-			uri: new Soup.URI('http://www.telize.com/geoip')
-		});
-		_httpSession.queue_message(request, function(_httpSession, message) {
-			if (message.status_code !== 200) {
-				self._updateNoInfo();
-				return;
-			}
-			var ipInfoJSON = request.response_body.data;
-			var ipInfo = JSON.parse(ipInfoJSON);
-			self._updateInfo(ipInfo.ip, ipInfo.isp, ipInfo.country,
-				ipInfo.country_code.toLowerCase());
-		});
-
-	},
-
-	_fetchIpOnly: function() {
-
+	_fetchFullInfo: function() {
+        IpGateway.getFullInfo(Lang.bind(this, this._updateInfo));
 	},
 
 	_updateNoInfo: function() {
+        Debugger.log("Updating with no info");
+        
 		this._infoBox.hide();
 		this.set_applet_tooltip(defaultTooltip);
 		this.set_applet_icon_symbolic_name(noConnectionIcon);
@@ -305,6 +334,14 @@ IpIndicatorApplet.prototype = {
 	},
 
 	_updateInfo: function(ip, isp, country, countryCode) {
+        Debugger.log("Updating info");
+        
+        countryCode = countryCode.toLowerCase();
+        Debugger.log("ip = "+ip, 2);
+        Debugger.log("isp = "+isp, 2);
+        Debugger.log("country = "+country, 2);
+        Debugger.log("countryCode = "+countryCode, 2);
+        
 		this._infoBox.show();
 		this._ip.set_text(ip);
 		this._country.set_text(country);
@@ -314,17 +351,23 @@ IpIndicatorApplet.prototype = {
 		var iconName;
 		var isIspSettingFound = false;
 
+		Debugger.log("Searching for ISP settings", 2);
 		for (var i = 0; i < this.ispsSettings.length; i++) {
 			var ispSetting = this.ispsSettings[i];
-			if (isp == ispSetting.name) {
+			if (isp == ispSetting.name) {				
+				Debugger.log("ISP setting found: "+ ispSetting.name, 2);
+				
 				if (ispSetting.icon) {
 					iconName = ispSetting.icon;
 				} else {
 					iconName = countryCode;
-				}
+				}		
+				Debugger.log("iconName: "+ iconName, 2);
+				
 				if (ispSetting.nickname) {
 					tooltip = ispSetting.nickname;
 					ispName = ispSetting.nickname;
+					Debugger.log("nickname: "+ ispSetting.nickname, 2);
 				}
 				isIspSettingFound = true;
 				break;
@@ -346,54 +389,74 @@ IpIndicatorApplet.prototype = {
 		this.set_applet_tooltip(tooltip);
 		this._isp.set_text(ispName);
 	},
-
-	_fetchInfoPeriodic: function() {
-		this._fetchInfo();
-		this._periodicTimeoutId = Mainloop.timeout_add_seconds(
-			this.updateInterval, Lang.bind(this, this._fetchInfoPeriodic));
-	},
+    
+    _isPublicIpChanged: function(actionIfYes) {
+        Debugger.log("Checking if public IP has changed");
+        
+        IpGateway.getOnlyIp(Lang.bind(this, function(ip) {
+            let oldPublicIP = this._publicIp;
+            this._publicIp = ip;
+            
+            Debugger.log("Old public IP: "+oldPublicIP, 2);
+            Debugger.log("Current public IP: "+this._publicIp, 2);
+            
+            let areChanged = oldPublicIP != this._publicIp;
+            if (areChanged) Debugger.log("CHANGED!!!"); else  Debugger.log("ARE NOT CHANGED");
+            if (areChanged) {
+                actionIfYes();
+            }
+        }));
+    },
 
 	_areNetworkInterfacesChanged: function() {
-		this.debug("Checking if traceroute has changed");
+		Debugger.log("Checking if network interfaces have changed");
+        
 		let oldInterfaces = this._interfaces;
 		this._interfaces = this._getNetworkInterfaces().sort();
 
-		this.debug("Old interfaces: " + oldInterfaces);
-		this.debug("Current interfaces: " + this._interfaces);
-		return oldInterfaces.toString() == this._interfaces.toString();
+		Debugger.log("Old interfaces: " + oldInterfaces, 2);
+		Debugger.log("Current interfaces: " + this._interfaces, 2);
+        
+        let areChanged = oldInterfaces.toString() != this._interfaces.toString();
+        if (areChanged) Debugger.log("CHANGED!!!"); else  Debugger.log("ARE NOT CHANGED");
+		return areChanged;
 	},
 
 	_getNetworkInterfaces: function() {
-		this.debug("Executing " + this._getNetworkInterfacesPath);
+		Debugger.log("Executing " + this._getNetworkInterfacesPath, 2);
+        
 		let output = GLib.spawn_command_line_sync(this._getNetworkInterfacesPath);
 		let interfaces = output[1].toString().split("\n");
+		//remove Iface column header
 		interfaces.splice(0, 1);
+		//remove last empty element
 		interfaces.splice(-1, 1);
 		return interfaces;
 	},
 
 	_restartTimer: function() {
-		if (this._periodicTimeoutId) {
-			Mainloop.source_remove(this._periodicTimeoutId);
-		}
-		this._fetchInfoPeriodic();
+		this._removeTimer();
+		this._updateViaIfconfigPeriodic();
+		this._updateViaIpServicePeriodic();
 	},
+    
+    _removeTimer: function() {
+		if (this._periodicTimeoutIfconfigId) {
+			Mainloop.source_remove(this._periodicTimeoutIfconfigId);
+		}
+		if (this._periodicTimeoutIpServiceId) {
+			Mainloop.source_remove(this._periodicTimeoutIpServiceId);
+		}
+    },
 
 	on_applet_removed_from_panel: function() {
-		if (this._periodicTimeoutId) {
-			Mainloop.source_remove(this._periodicTimeoutId);
-		}
+		this._removeTimer();
 		this.settings.finalize();
 	},
 
 	on_applet_clicked: function() {
-		//this.menu.toggle();
-		global.log(this._areNetworkInterfacesChanged());
-        IpGateway.getOnlyIp(function(ip) { global.log("*** callback: " +ip);});
-	},
-
-	debug: function(message) {
-		global.log(message);
+        this._restartTimer();
+		this.menu.toggle();
 	}
 };
 
