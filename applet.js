@@ -1,31 +1,19 @@
-/*jshint esnext: true */
-const
-Clutter = imports.gi.Clutter;
-const
-Applet = imports.ui.applet;
-const
-PopupMenu = imports.ui.popupMenu;
-const
-Util = imports.misc.util;
-const
-St = imports.gi.St;
-const
-Gtk = imports.gi.Gtk;
-const
-Soup = imports.gi.Soup;
-const
-_httpSession = new Soup.SessionAsync();
-const
-Lang = imports.lang;
-const
-Mainloop = imports.mainloop;
-const
-Settings = imports.ui.settings;
-const
-Gio = imports.gi.Gio;
+const Clutter = imports.gi.Clutter;
+const Applet = imports.ui.applet;
+const PopupMenu = imports.ui.popupMenu;
+const Util = imports.misc.util;
+const St = imports.gi.St;
+const Gtk = imports.gi.Gtk;
+const Soup = imports.gi.Soup;
+const _httpSession = new Soup.SessionAsync();
+const Lang = imports.lang;
+const Mainloop = imports.mainloop;
+const Settings = imports.ui.settings;
+const Gio = imports.gi.Gio;
+const GLib = imports.gi.GLib;
 
 Soup.Session.prototype.add_feature.call(_httpSession,
-		new Soup.ProxyResolverDefault());
+	new Soup.ProxyResolverDefault());
 
 var defaultTooltip = _("trying to fetch IP information");
 var noConnectionIcon = "nm-no-connection";
@@ -36,17 +24,18 @@ function IpIndicatorApplet(metadata, orientation, panel_height, instance_id) {
 }
 
 IpIndicatorApplet.prototype = {
-	__proto__ : Applet.IconApplet.prototype,
+	__proto__: Applet.IconApplet.prototype,
 
-	_init : function(metadata, orientation, panel_height, instance_id) {
+	_init: function(metadata, orientation, panel_height, instance_id) {
 		Applet.IconApplet.prototype._init.call(this, orientation, panel_height,
-				instance_id);
+			instance_id);
 		try {
 			this.icon_theme = Gtk.IconTheme.get_default();
 			this.icon_theme.append_search_path(metadata.path + "/flags");
+			this._getNetworkInterfacesPath = metadata.path + "/getNetworkInterfaces.sh";
 
 			this.settings = new Settings.AppletSettings(this, metadata.uuid,
-					instance_id);
+				instance_id);
 			this._buildSettings();
 
 			this.menuManager = new PopupMenu.PopupMenuManager(this);
@@ -60,73 +49,73 @@ IpIndicatorApplet.prototype = {
 		}
 	},
 
-	_buildSettings : function() {
+	_buildSettings: function() {
 		this.settings.bindProperty(Settings.BindingDirection.IN, "home_isp",
-				"homeIspName", this._updateSettings, null);
+			"homeIspName", this._updateSettings, null);
 		this.settings
-				.bindProperty(Settings.BindingDirection.IN,
-						"home_isp_icon-name", "homeIspIcon",
-						this._updateSettings, null);
+			.bindProperty(Settings.BindingDirection.IN,
+				"home_isp_icon-name", "homeIspIcon",
+				this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"home_isp_nickname", "homeIspNickname", this._updateSettings,
-				null);
+			"home_isp_nickname", "homeIspNickname", this._updateSettings,
+			null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN, "other1_isp",
-				"other1IspName", this._updateSettings, null);
+			"other1IspName", this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other1_isp_icon-name", "other1IspIcon", this._updateSettings,
-				null);
+			"other1_isp_icon-name", "other1IspIcon", this._updateSettings,
+			null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other1_isp_nickname", "other1IspNickname",
-				this._updateSettings, null);
+			"other1_isp_nickname", "other1IspNickname",
+			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN, "other2_isp",
-				"other2IspName", this._updateSettings, null);
+			"other2IspName", this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other2_isp_icon-name", "other2IspIcon", this._updateSettings,
-				null);
+			"other2_isp_icon-name", "other2IspIcon", this._updateSettings,
+			null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other2_isp_nickname", "other2IspNickname",
-				this._updateSettings, null);
+			"other2_isp_nickname", "other2IspNickname",
+			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN, "other3_isp",
-				"other3IspName", this._updateSettings, null);
+			"other3IspName", this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other3_isp_icon-name", "other3IspIcon", this._updateSettings,
-				null);
+			"other3_isp_icon-name", "other3IspIcon", this._updateSettings,
+			null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other3_isp_nickname", "other3IspNickname",
-				this._updateSettings, null);
+			"other3_isp_nickname", "other3IspNickname",
+			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN, "other4_isp",
-				"other4IspName", this._updateSettings, null);
+			"other4IspName", this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other4_isp_icon-name", "other4IspIcon", this._updateSettings,
-				null);
+			"other4_isp_icon-name", "other4IspIcon", this._updateSettings,
+			null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other4_isp_nickname", "other4IspNickname",
-				this._updateSettings, null);
+			"other4_isp_nickname", "other4IspNickname",
+			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN, "other5_isp",
-				"other5IspName", this._updateSettings, null);
+			"other5IspName", this._updateSettings, null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other5_isp_icon-name", "other5IspIcon", this._updateSettings,
-				null);
+			"other5_isp_icon-name", "other5IspIcon", this._updateSettings,
+			null);
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"other5_isp_nickname", "other5IspNickname",
-				this._updateSettings, null);
+			"other5_isp_nickname", "other5IspNickname",
+			this._updateSettings, null);
 
 		this.settings.bindProperty(Settings.BindingDirection.IN,
-				"update_interval", "updateInterval", this._restartTimer, null);
+			"update_interval", "updateInterval", this._restartTimer, null);
 		this._prepareIspsSettings();
 	},
 
-	_updateSettings : function() {
+	_updateSettings: function() {
 		this._prepareIspsSettings();
 		this._fetchInfo();
 	},
 
-	_buildMenu : function(orientation) {
+	_buildMenu: function(orientation) {
 		this.menu = new Applet.AppletPopupMenu(this, orientation);
 		this.menuManager.addMenu(this.menu);
 
@@ -153,46 +142,47 @@ IpIndicatorApplet.prototype = {
 
 	},
 
-	_prepareIspsSettings : function() {
+	_prepareIspsSettings: function() {
 		this.homeIsp = {
-			name : this.homeIspName,
-			icon : this.homeIspIcon,
-			nickname : this.homeIspNickname
+			name: this.homeIspName,
+			icon: this.homeIspIcon,
+			nickname: this.homeIspNickname
 		};
 		this.other1_isp = {
-			name : this.other1IspName,
-			icon : this.other1IspIcon,
-			nickname : this.other1IspNickname
+			name: this.other1IspName,
+			icon: this.other1IspIcon,
+			nickname: this.other1IspNickname
 		};
 		this.other2_isp = {
-			name : this.other2IspName,
-			icon : this.other2IspIcon,
-			nickname : this.other2IspNickname
+			name: this.other2IspName,
+			icon: this.other2IspIcon,
+			nickname: this.other2IspNickname
 		};
 		this.other3_isp = {
-			name : this.other3IspName,
-			icon : this.other3IspIcon,
-			nickname : this.other3IspNickname
+			name: this.other3IspName,
+			icon: this.other3IspIcon,
+			nickname: this.other3IspNickname
 		};
 		this.other4_isp = {
-			name : this.other4IspName,
-			icon : this.other4IspIcon,
-			nickname : this.other4IspNickname
+			name: this.other4IspName,
+			icon: this.other4IspIcon,
+			nickname: this.other4IspNickname
 		};
 		this.other5_isp = {
-			name : this.other5IspName,
-			icon : this.other5IspIcon,
-			nickname : this.other5IspNickname
+			name: this.other5IspName,
+			icon: this.other5IspIcon,
+			nickname: this.other5IspNickname
 		};
-		this.ispsSettings = [ this.homeIsp, this.other1_isp, this.other2_isp,
-				this.other3_isp, this.other4_isp, this.other5_isp ];
+		this.ispsSettings = [this.homeIsp, this.other1_isp, this.other2_isp,
+			this.other3_isp, this.other4_isp, this.other5_isp
+		];
 	},
 
-	_fetchInfo : function() {
+	_fetchInfo: function() {
 		var self = this;
 		var request = new Soup.Message({
-			method : 'GET',
-			uri : new Soup.URI('http://www.telize.com/geoip')
+			method: 'GET',
+			uri: new Soup.URI('http://www.telize.com/geoip')
 		});
 		_httpSession.queue_message(request, function(_httpSession, message) {
 			if (message.status_code !== 200) {
@@ -202,19 +192,19 @@ IpIndicatorApplet.prototype = {
 			var ipInfoJSON = request.response_body.data;
 			var ipInfo = JSON.parse(ipInfoJSON);
 			self._updateInfo(ipInfo.ip, ipInfo.isp, ipInfo.country,
-					ipInfo.country_code.toLowerCase());
+				ipInfo.country_code.toLowerCase());
 		});
 
 	},
 
-	_updateNoInfo : function() {
+	_updateNoInfo: function() {
 		this._infoBox.hide();
 		this.set_applet_tooltip(defaultTooltip);
 		this.set_applet_icon_symbolic_name(noConnectionIcon);
 		this.set_applet_icon_name(noConnectionIcon);
 	},
 
-	_updateInfo : function(ip, isp, country, countryCode) {
+	_updateInfo: function(ip, isp, country, countryCode) {
 		this._infoBox.show();
 		this._ip.set_text(ip);
 		this._country.set_text(country);
@@ -257,32 +247,56 @@ IpIndicatorApplet.prototype = {
 		this._isp.set_text(ispName);
 	},
 
-	_fetchInfoPeriodic : function() {
+	_fetchInfoPeriodic: function() {
 		this._fetchInfo();
 		this._periodicTimeoutId = Mainloop.timeout_add_seconds(
-				this.updateInterval, Lang.bind(this, this._fetchInfoPeriodic));
+			this.updateInterval, Lang.bind(this, this._fetchInfoPeriodic));
 	},
 
-	_restartTimer : function() {
+	_areNetworkInterfacesChanged: function() {
+		this.debug("Checking if traceroute has changed");
+		let oldInterfaces = this._interfaces;
+		this._interfaces = this._getNetworkInterfaces().sort();
+
+		this.debug("Old interfaces: " + oldInterfaces);
+		this.debug("Current interfaces: " + this._interfaces);
+		return oldInterfaces.toString() == this._interfaces.toString();
+	},
+
+	_getNetworkInterfaces: function() {
+		this.debug("Executing " + this._getNetworkInterfacesPath);
+		let output = GLib.spawn_command_line_sync(this._getNetworkInterfacesPath);
+		let interfaces = output[1].toString().split("\n");
+		interfaces.splice(0, 1);
+		interfaces.splice(-1, 1);
+		return interfaces;
+	},
+
+	_restartTimer: function() {
 		if (this._periodicTimeoutId) {
 			Mainloop.source_remove(this._periodicTimeoutId);
 		}
 		this._fetchInfoPeriodic();
 	},
 
-	on_applet_removed_from_panel : function() {
+	on_applet_removed_from_panel: function() {
 		if (this._periodicTimeoutId) {
 			Mainloop.source_remove(this._periodicTimeoutId);
 		}
 		this.settings.finalize();
 	},
 
-	on_applet_clicked : function() {
-		this.menu.toggle();
+	on_applet_clicked: function() {
+		//this.menu.toggle();
+		this._areNetworkInterfacesChanged();
+	},
+
+	debug: function(message) {
+		global.log(message);
 	}
 };
 
 function main(metadata, orientation, panel_height, instance_id) {
 	return new IpIndicatorApplet(metadata, orientation, panel_height,
-			instance_id);
+		instance_id);
 }
