@@ -19,6 +19,100 @@ var defaultTooltip = _("trying to fetch IP information");
 var noConnectionIcon = "nm-no-connection";
 var homeIcon = "gtk-home";
 
+IpGateway = {
+	init: function() {
+		this._services = [];
+        this._ispServices = [];
+        this._serviceIteration = 0;
+        
+		//this._services.push({ url: "", parse: function(response) {}});
+		this._services.push({
+			url: "https://api.ipify.org?format=json",
+			parse: function(jsonResponse) {
+                let response = JSON.parse(jsonResponse);
+				return response.ip;
+			}
+		});
+		this._services.push({
+			url: "http://bot.whatismyipaddress.com/",
+			parse: function(response) {
+				return response;
+			}
+		});
+		this._services.push({
+			url: "http://geoip.nekudo.com/api/",
+			parse: function(jsonResponse) {
+                let response = JSON.parse(jsonResponse);
+				return response.ip;
+			}
+		});
+		this._services.push({
+			url: "http://ip-json.rhcloud.com/json",
+			parse: function(jsonResponse) {
+                let response = JSON.parse(jsonResponse);
+				return response.q;
+			}
+		});
+		this._services.push({
+			url: "http://ipinfo.io/json",
+			parse: function(jsonResponse) {
+                let response = JSON.parse(jsonResponse);
+				return response.ip;
+			}
+		});
+
+
+		this._ispServices.push({
+			url: "http://ip-api.com/json",
+			parse: function(jsonResponse) {
+                let response = JSON.parse(jsonResponse);
+				return {
+					ip: response.ip,
+					isp: reponse.isp,
+                    country: response.country,
+					countryCode: reponse.countryCode
+				};
+			}
+		});
+	},
+
+	getOnlyIp: function(callback) {
+        if (this._serviceIteration + 1 >= this._services.length) {
+            this._serviceIteration = 0;
+        } else {
+            this._serviceIteration += 1;
+        }
+        let service = this._services[this._serviceIteration];
+        this._get(service.url, function(response) {
+            let ip = service.parse(response);
+            callback(ip);
+        });
+	},
+    
+	getFullInfo: function(callback) {
+        let service = this._ispServices[0];
+        this._get(service.url, function(response) {
+            let fullInfo = parse(response);
+            callback(fullInfo.ip, fullInfo.isp, fullInfo.country, fullInfo.countryCode);
+        });
+	},
+    
+    _get: function(url, callback) {
+        global.log(url);
+		var request = new Soup.Message({
+			method: 'GET',
+			uri: new Soup.URI(url)
+		});
+		_httpSession.queue_message(request, function(_httpSession, message) {
+			if (message.status_code !== 200) {				
+				return;
+			}
+            let data = request.response_body.data;
+			callback(data);
+		});
+    }
+}
+
 function IpIndicatorApplet(metadata, orientation, panel_height, instance_id) {
 	this._init(metadata, orientation, panel_height, instance_id);
 }
@@ -33,6 +127,8 @@ IpIndicatorApplet.prototype = {
 			this.icon_theme = Gtk.IconTheme.get_default();
 			this.icon_theme.append_search_path(metadata.path + "/flags");
 			this._getNetworkInterfacesPath = metadata.path + "/getNetworkInterfaces.sh";
+            this._interfaces = [];
+            IpGateway.init();
 
 			this.settings = new Settings.AppletSettings(this, metadata.uuid,
 				instance_id);
@@ -197,6 +293,10 @@ IpIndicatorApplet.prototype = {
 
 	},
 
+	_fetchIpOnly: function() {
+
+	},
+
 	_updateNoInfo: function() {
 		this._infoBox.hide();
 		this.set_applet_tooltip(defaultTooltip);
@@ -288,7 +388,8 @@ IpIndicatorApplet.prototype = {
 
 	on_applet_clicked: function() {
 		//this.menu.toggle();
-		this._areNetworkInterfacesChanged();
+		global.log(this._areNetworkInterfacesChanged());
+        IpGateway.getOnlyIp(function(ip) { global.log("*** callback: " +ip);});
 	},
 
 	debug: function(message) {
