@@ -79,7 +79,8 @@ IpGateway = {
 
         // ISP Service should be only one, because different services return different ISPs
 		this._ispServices.push({
-			url: "http://ip-api.com/json",
+			// http://ip-api.com/docs/api:returned_values#selectable_output
+			url: "http://ip-api.com/json?fields=country,countryCode,isp,query",
 			parse: function(jsonResponse) {
 				let response = JSON.parse(jsonResponse);
 				return {
